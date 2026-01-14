@@ -2,7 +2,7 @@
     "name": "lindemannrock/craft-survey-campaigns",
     "description": "Campaign management for automotive surveys with SMS and email invitations",
     "type": "craft-plugin",
-    "version": "5.0.1",
+    "version": "5.0.2",
     "keywords": [
         "craft",
         "cms",

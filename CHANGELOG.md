@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.2](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.1...v5.0.2) (2026-01-14)
+
+
+### Bug Fixes
+
+* streamline campaign record retrieval in CampaignSettingsField ([90e8d58](https://github.com/LindemannRock/craft-survey-campaigns/commit/90e8d58abdc74a26dcb3e47d335db4e035d873b9))
+
 ## [5.0.1](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.0...v5.0.1) (2026-01-14)
 
 
