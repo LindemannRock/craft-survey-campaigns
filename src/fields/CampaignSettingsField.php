@@ -114,11 +114,9 @@ class CampaignSettingsField extends Field implements PreviewableFieldInterface
         }
 
         $record = null;
-        if ($element !== null && method_exists($element, 'getCampaignRecord')) {
-            $record = $element->getCampaignRecord();
-        }
-        if ($record === null && $element !== null) {
-            $record = CampaignRecord::makeForElement($element);
+        if ($element !== null) {
+            /** @phpstan-ignore method.notFound (method from CampaignBehavior) */
+            $record = $element->getCampaignRecord() ?? CampaignRecord::makeForElement($element);
         }
         if ($record === null) {
             return null;
