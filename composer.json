@@ -1,0 +1,63 @@
+{
+    "name": "lindemannrock/craft-survey-campaigns",
+    "description": "Campaign management for automotive surveys with SMS and email invitations",
+    "type": "craft-plugin",
+    "version": "5.0.0",
+    "keywords": [
+        "craft",
+        "cms",
+        "craftcms",
+        "craft-plugin",
+        "surveys",
+        "campaigns",
+        "formie",
+        "sms",
+        "invitations"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Bilal Hary Lindemann",
+            "email": "bh@lindemannrock.com",
+            "homepage": "https://lindemannrock.com",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "email": "support@lindemannrock.com",
+        "issues": "https://github.com/LindemannRock/craft-survey-campaigns/issues",
+        "source": "https://github.com/LindemannRock/craft-survey-campaigns",
+        "docs": "https://github.com/LindemannRock/craft-survey-campaigns/blob/main/README.md"
+    },
+    "require": {
+        "php": "^8.2",
+        "craftcms/cms": "^5.0.0",
+        "lindemannrock/craft-plugin-base": "^5.0",
+        "lindemannrock/craft-logging-library": "^5.0",
+        "lindemannrock/craft-sms-manager": "^5.0",
+        "verbb/formie": "^3.0"
+    },
+    "require-dev": {
+        "craftcms/ecs": "dev-main",
+        "craftcms/phpstan": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "lindemannrock\\surveycampaigns\\": "src/"
+        }
+    },
+    "scripts": {
+        "phpstan": "phpstan --ansi --memory-limit=1G",
+        "check-cs": "ecs check --ansi",
+        "fix-cs": "ecs check --fix --ansi"
+    },
+    "extra": {
+        "name": "Survey Campaigns",
+        "handle": "formie-campaigns",
+        "developer": "LindemannRock",
+        "developerUrl": "https://lindemannrock.com",
+        "documentationUrl": "https://github.com/LindemannRock/craft-survey-campaigns/blob/main/README.md",
+        "changelogUrl": "https://github.com/LindemannRock/craft-survey-campaigns/blob/main/CHANGELOG.md",
+        "class": "lindemannrock\\surveycampaigns\\SurveyCampaigns"
+    }
+}

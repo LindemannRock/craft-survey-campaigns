@@ -1,0 +1,153 @@
+{% extends "_layouts/cp" %}
+{% import "_includes/forms" as forms %}
+
+{% set plugin = craft.app.plugins.getPlugin('formie-campaigns') %}
+{% set settings = plugin.getSettings() %}
+
+{# Site handling #}
+{% set siteHandle = craft.app.request.getParam('site') %}
+{% set site = siteHandle ? craft.app.getSites().getSiteByHandle(siteHandle) : craft.app.sites.getPrimarySite() %}
+
+{# Get campaign #}
+{% set campaign = formieCampaigns.campaigns.find().id(campaignId).siteId(site.id).one() %}
+{% if not campaign %}
+    {% exit 404 %}
+{% endif %}
+
+{% set title = 'Import Customers'|t('formie-campaigns') %}
+{% set fullPageForm = true %}
+{% set selectedSubnavItem = 'campaigns' %}
+
+{# Site switcher in crumbs #}
+{% set crumbs = [] %}
+{% if craft.app.getIsMultiSite() %}
+    {% set siteMenuItems = [] %}
+    {% for s in craft.app.sites.getAllSites() %}
+        {% set siteMenuItems = siteMenuItems|merge([{
+            label: s.name,
+            url: cpUrl('formie-campaigns/' ~ campaignId ~ '/import-customers', {site: s.handle}),
+            selected: s.handle == site.handle
+        }]) %}
+    {% endfor %}
+
+    {% set crumbs = [{
+        id: 'site-crumb',
+        icon: 'world',
+        label: site.name|t('site'),
+        menu: {
+            items: siteMenuItems,
+            label: 'Select site'|t('app')
+        }
+    }] %}
+{% endif %}
+
+{% set crumbs = crumbs|merge([
+    { label: settings.pluginName, url: cpUrl('formie-campaigns', {site: site.handle}) },
+    { label: campaign.title, url: cpUrl('formie-campaigns/' ~ campaignId ~ '/customers', {site: site.handle}) },
+]) %}
+
+{% block actionButton %}
+    <div class="btngroup submit">
+        <button type="submit" class="btn submit">{{ 'Import'|t('formie-campaigns') }}</button>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <input type="hidden" name="action" value="formie-campaigns/customers/import">
+    <input type="hidden" name="redirect" value="{{ ('formie-campaigns/' ~ campaignId ~ '/customers?site=' ~ site.handle)|hash }}">
+    <input type="hidden" name="campaignId" value="{{ campaignId }}">
+    {{ csrfInput() }}
+
+    {% if errors is defined %}
+        <div class="pane error" style="margin-bottom: 24px;">
+            <p><strong>{{ 'Unable to import the following rows:'|t('formie-campaigns') }}</strong></p>
+            <p>{{ errors|join(', ') }}</p>
+        </div>
+    {% endif %}
+
+    <h2 style="margin-top: 0;">{{ 'Import Customers from CSV'|t('formie-campaigns') }}</h2>
+
+    <p>{{ 'Upload a CSV file to import customers into this campaign. After import, you can run the campaign to send invitations.'|t('formie-campaigns') }}</p>
+
+    {% set csvFormatTip %}
+        <h4>{{ 'CSV Format'|t('formie-campaigns') }}</h4>
+        <p><strong>{{ 'Required columns:'|t('formie-campaigns') }}</strong></p>
+        <ul>
+            <li><code>Name</code> - {{ 'Customer name'|t('formie-campaigns') }}</li>
+        </ul>
+        <p><strong>{{ 'Optional columns:'|t('formie-campaigns') }}</strong></p>
+        <ul>
+            <li><code>Email</code> - {{ 'Email address for email invitations'|t('formie-campaigns') }}</li>
+            <li><code>Phone</code> - {{ 'Phone number for SMS invitations'|t('formie-campaigns') }}</li>
+            <li><code>Language</code> - {{ 'en or ar (determines site)'|t('formie-campaigns') }}</li>
+        </ul>
+        <p><strong>{{ 'Example:'|t('formie-campaigns') }}</strong></p>
+        <pre style="background: #f3f4f6; padding: 8px; border-radius: 4px; font-size: 12px;">Name,Email,Phone,Language
+John Doe,john@example.com,96512345678,en
+Ahmed Ali,ahmed@example.com,96598765432,ar</pre>
+    {% endset %}
+
+    <div class="field">
+        <div class="heading">
+            <label>{{ 'CSV File Format'|t('formie-campaigns') }}</label>
+            <span class="info">{{ csvFormatTip|raw }}</span>
+            <div class="instructions">
+                <p>{{ 'Your CSV should include Name, Email, Phone, and Language columns. Click the info icon for details.'|t('formie-campaigns') }}</p>
+            </div>
+        </div>
+    </div>
+
+    {{ forms.fileField({
+        label: 'CSV File'|t('formie-campaigns'),
+        instructions: 'Select a CSV file to import customers.'|t('formie-campaigns'),
+        id: 'file',
+        name: 'file',
+        required: true
+    }) }}
+
+    {{ forms.lightswitchField({
+        label: 'Send Invitations After Import'|t('formie-campaigns'),
+        instructions: 'Automatically queue invitation sending after import completes.'|t('formie-campaigns'),
+        id: 'queueSending',
+        name: 'queueSending',
+        on: true,
+    }) }}
+{% endblock %}
+
+{% block details %}
+    <fieldset>
+        <legend class="h6">{{ 'Details'|t('formie-campaigns') }}</legend>
+        <div class="meta">
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Campaign'|t('formie-campaigns') }}</label>
+                </div>
+                <div class="input">
+                    <a href="{{ cpUrl('formie-campaigns/' ~ campaignId ~ '/customers', {site: site.handle}) }}">{{ campaign.title }}</a>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Site'|t('formie-campaigns') }}</label>
+                </div>
+                <div class="input">
+                    {{ site.name }}
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Template'|t('formie-campaigns') }}</label>
+                </div>
+                <div class="input">
+                    <form method="post">
+                        {{ csrfInput() }}
+                        {{ actionInput('formie-campaigns/customers/download-sample') }}
+                        <button type="submit" class="btn">{{ 'Download CSV Template'|t('formie-campaigns') }}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+{% endblock %}

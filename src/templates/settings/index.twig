@@ -1,0 +1,87 @@
+{% extends "_layouts/cp" %}
+{% import "_includes/forms" as forms %}
+
+{% set plugin = craft.app.plugins.getPlugin('formie-campaigns') %}
+
+{% set title = "Settings"|t('formie-campaigns') %}
+{% set fullPageForm = true %}
+{% set selectedSubnavItem = 'settings' %}
+
+{% set crumbs = [
+    { label: settings.pluginName, url: url('formie-campaigns') },
+    { label: 'Settings'|t('formie-campaigns'), url: url('formie-campaigns/settings') }
+] %}
+
+{% block actionButton %}
+    <input type="submit" class="btn submit" value="{{ 'Save'|t('app') }}">
+{% endblock %}
+
+{% block content %}
+    <input type="hidden" name="action" value="formie-campaigns/settings/save">
+    <input type="hidden" name="redirect" value="{{ 'formie-campaigns/settings'|hash }}">
+    {{ csrfInput() }}
+
+    {{ forms.textField({
+        label: "Plugin Name"|t('formie-campaigns'),
+        instructions: "The display name for this plugin in the control panel."|t('formie-campaigns'),
+        id: 'pluginName',
+        name: 'settings[pluginName]',
+        value: settings.pluginName,
+    }) }}
+
+    {{ forms.textField({
+        label: "Campaign Section Handle"|t('formie-campaigns'),
+        instructions: "The handle of the section that contains campaigns."|t('formie-campaigns'),
+        id: 'campaignSectionHandle',
+        name: 'settings[campaignSectionHandle]',
+        value: settings.campaignSectionHandle,
+    }) }}
+
+    {{ forms.selectField({
+        label: "Log Level"|t('formie-campaigns'),
+        instructions: "The minimum log level to record. Debug shows the most detail."|t('formie-campaigns'),
+        id: 'logLevel',
+        name: 'settings[logLevel]',
+        value: settings.logLevel,
+        options: [
+            { label: 'Debug', value: 'debug' },
+            { label: 'Info', value: 'info' },
+            { label: 'Warning', value: 'warning' },
+            { label: 'Error', value: 'error' },
+        ],
+    }) }}
+
+    <hr>
+
+    <h2>{{ "SMS Settings"|t('formie-campaigns') }}</h2>
+
+    {% set senderIdOptions = craft.formieCampaigns.sms.getSenderIdOptions() %}
+    {{ forms.selectField({
+        label: "Default Sender ID"|t('formie-campaigns'),
+        instructions: "The default SMS sender ID to use when sending campaign invitations."|t('formie-campaigns'),
+        id: 'defaultSenderIdId',
+        name: 'settings[defaultSenderIdId]',
+        value: settings.defaultSenderIdId,
+        options: senderIdOptions,
+    }) }}
+
+    <hr>
+
+    <h2>{{ "Invitation Settings"|t('formie-campaigns') }}</h2>
+
+    {{ forms.textField({
+        label: "Invitation Route"|t('formie-campaigns'),
+        instructions: "The route for invitation pages."|t('formie-campaigns'),
+        id: 'invitationRoute',
+        name: 'settings[invitationRoute]',
+        value: settings.invitationRoute,
+    }) }}
+
+    {{ forms.textField({
+        label: "Invitation Template"|t('formie-campaigns'),
+        instructions: "The template to use for invitation pages (optional)."|t('formie-campaigns'),
+        id: 'invitationTemplate',
+        name: 'settings[invitationTemplate]',
+        value: settings.invitationTemplate,
+    }) }}
+{% endblock %}

@@ -1,0 +1,165 @@
+{% import "_includes/forms" as forms %}
+
+{% set surveyCampaigns = craft.app.plugins.getPlugin('formie-campaigns') %}
+{% set settings = surveyCampaigns.getSettings() %}
+
+{% set siteLocale = element.getSite().getLocale() %}
+{% set siteOrientation = siteLocale.getOrientation() %}
+
+{% css %}
+.campaign-settings-field .input span {
+    display: block;
+    width: 100%;
+}
+.campaign-settings-field .input input.text.fullwidth,
+.campaign-settings-field .input textarea.fullwidth,
+.campaign-settings-field .input select.fullwidth {
+    width: 100%;
+}
+{% endcss %}
+
+<div class="pane campaign-settings-field" style="padding: 0;">
+	<div class="meta">
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-campaignType" | namespace }}">
+					{{ "Campaign Type" | t('formie-campaigns') }}
+				</label>
+			</div>
+			<div class="input">
+                <span>
+                    {% if settings.campaignTypeOptions is not empty %}
+						{% include '_includes/forms/select' with {
+							id: "#{handle}-campaignType",
+							name: "#{handle}[campaignType]",
+							value: value.campaignType ?? null,
+							options: settings.getCampaignTypeOptions(),
+							class: 'fullwidth',
+						} %}
+					{% else %}
+						{% include '_includes/forms/text' with {
+							id: "#{handle}-campaignType",
+							name: "#{handle}[campaignType]",
+							value: value.campaignType ?? null,
+							class: 'fullwidth',
+						} %}
+					{% endif %}
+                </span>
+			</div>
+		</div>
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-form" | namespace }}">
+					{{ "Form" | t('formie-campaigns') }}
+				</label>
+			</div>
+			<div class="input">
+                <span>
+					{% include '_includes/forms/elementSelect' with {
+						elementType: 'verbb\\formie\\elements\\Form',
+						id: "#{handle}-form",
+						name: "#{handle}[form]",
+						elements: value.getForm() ? [value.getForm()] : [],
+						limit: 1,
+					} %}
+                </span>
+			</div>
+		</div>
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-emailInvitationMessage" | namespace }}">
+					{{ "Email Invitation Message" | t('formie-campaigns') }}
+				</label>
+			</div>
+
+
+			<div class="input {{ siteOrientation }}">
+                <span>
+
+					{{ craft.formieCampaigns.ckeEditorHtml(emailMessage ?? value.emailInvitationMessage  | raw, 'Email Invitation Message', handle~'[emailInvitationMessage]', element) | raw }}
+
+                </span>
+			</div>
+		</div>
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-emailInvitationSubject" | namespace }}">
+					{{ "Email Invitation Subject" | t('formie-campaigns') }}
+				</label>
+			</div>
+			<div class="input {{ siteOrientation }}">
+                <span>
+                    {% include '_includes/forms/text' with {
+						id: "#{handle}-emailInvitationSubject",
+						name: "#{handle}[emailInvitationSubject]",
+						value: value.emailInvitationSubject ?? null,
+						orientation: siteOrientation,
+						class: 'fullwidth',
+					} %}
+                </span>
+			</div>
+		</div>
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-smsInvitationMessage" | namespace }}">
+					{{ "SMS Invitation Message" | t('formie-campaigns') }}
+				</label>
+			</div>
+			<div class="input {{ siteOrientation }}">
+                <span>
+                    {% include '_includes/forms/textarea' with {
+						id: "#{handle}-smsInvitationMessage",
+						name: "#{handle}[smsInvitationMessage]",
+						value: value.smsInvitationMessage ?? null,
+						orientation: siteOrientation,
+						rows: 10,
+						class: 'fullwidth',
+					} %}
+                </span>
+			</div>
+		</div>
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-invitationExpiryPeriod" | namespace }}">
+					{{ "Invitation Expiry Period. e.g: (P1D -> 1day)" | t('formie-campaigns') }}
+				</label>
+			</div>
+			<div class="input">
+                <span>
+                    {% include '_includes/forms/text' with {
+						id: "#{handle}-invitationExpiryPeriod",
+						name: "#{handle}[invitationExpiryPeriod]",
+						value: value.invitationExpiryPeriod ?? null,
+						size: 10,
+					} %}
+                </span>
+			</div>
+		</div>
+
+		<div class="field">
+			<div class="heading">
+				<label for="{{ "#{handle}-senderId" | namespace }}">
+					{{ "Sender ID" | t('formie-campaigns') }}
+				</label>
+			</div>
+			<div class="input">
+                <span>
+					{# Use SMS Manager for sender ID dropdown #}
+					{% include '_includes/forms/select' with {
+						id: "#{handle}-senderId",
+						name: "#{handle}[senderId]",
+						value: value.senderId ?? null,
+						options: formieCampaigns.sms.getSenderIdOptions(),
+					} %}
+                </span>
+			</div>
+		</div>
+
+	</div>
+</div>

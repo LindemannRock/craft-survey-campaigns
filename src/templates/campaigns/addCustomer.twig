@@ -1,0 +1,127 @@
+{% extends "_layouts/cp" %}
+{% import "_includes/forms" as forms %}
+
+{% set plugin = craft.app.plugins.getPlugin('formie-campaigns') %}
+{% set settings = plugin.getSettings() %}
+
+{# Site handling #}
+{% set siteHandle = craft.app.request.getParam('site') %}
+{% set site = siteHandle ? craft.app.getSites().getSiteByHandle(siteHandle) : craft.app.sites.getPrimarySite() %}
+
+{# Get campaign #}
+{% set campaign = formieCampaigns.campaigns.find().id(campaignId).siteId(site.id).one() %}
+{% if not campaign %}
+    {% exit 404 %}
+{% endif %}
+
+{% set title = 'Add Customer'|t('formie-campaigns') %}
+{% set fullPageForm = true %}
+{% set selectedSubnavItem = 'campaigns' %}
+
+{# Site switcher in crumbs #}
+{% set crumbs = [] %}
+{% if craft.app.getIsMultiSite() %}
+    {% set siteMenuItems = [] %}
+    {% for s in craft.app.sites.getAllSites() %}
+        {% set siteMenuItems = siteMenuItems|merge([{
+            label: s.name,
+            url: cpUrl('formie-campaigns/' ~ campaignId ~ '/add-customer', {site: s.handle}),
+            selected: s.handle == site.handle
+        }]) %}
+    {% endfor %}
+
+    {% set crumbs = [{
+        id: 'site-crumb',
+        icon: 'world',
+        label: site.name|t('site'),
+        menu: {
+            items: siteMenuItems,
+            label: 'Select site'|t('app')
+        }
+    }] %}
+{% endif %}
+
+{% set crumbs = crumbs|merge([
+    { label: settings.pluginName, url: cpUrl('formie-campaigns', {site: site.handle}) },
+    { label: campaign.title, url: cpUrl('formie-campaigns/' ~ campaignId ~ '/customers', {site: site.handle}) },
+]) %}
+
+{% block content %}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('formie-campaigns/customers/add') }}
+        {{ redirectInput('formie-campaigns/' ~ campaignId ~ '/customers?site=' ~ site.handle) }}
+        {{ hiddenInput('campaignId', campaignId) }}
+
+        {{ forms.textField({
+            first: true,
+            label: 'Name'|t('formie-campaigns'),
+            instructions: 'The customer\'s full name'|t('formie-campaigns'),
+            id: 'name',
+            name: 'name',
+            value: customer.name ?? null,
+            errors: customer.getErrors('name') ?? null,
+            autofocus: true,
+            required: true,
+        }) }}
+
+        {{ forms.textField({
+            label: 'Email'|t('formie-campaigns'),
+            instructions: 'The customer\'s email address (for email invitations)'|t('formie-campaigns'),
+            id: 'email',
+            name: 'email',
+            class: 'code',
+            autocorrect: false,
+            autocapitalize: false,
+            value: customer.email ?? null,
+            errors: customer.getErrors('email') ?? null,
+            required: false
+        }) }}
+
+        {{ forms.textField({
+            label: 'SMS'|t('formie-campaigns'),
+            instructions: 'The customer\'s phone number (for SMS invitations)'|t('formie-campaigns'),
+            id: 'sms',
+            name: 'sms',
+            class: 'code',
+            autocorrect: false,
+            autocapitalize: false,
+            value: customer.sms ?? null,
+            errors: customer.getErrors('sms') ?? null,
+            required: false
+        }) }}
+
+        {{ forms.selectField({
+            label: 'Site'|t('formie-campaigns'),
+            instructions: 'The site for the invitation and submission'|t('formie-campaigns'),
+            id: 'siteId',
+            name: 'siteId',
+            options: craft.app.sites.getAllSites()|map(s => { label: s.name, value: s.id }),
+            value: customer.siteId ?? site.id,
+            errors: customer.getErrors('siteId') ?? null,
+            required: true
+        }) }}
+    </form>
+{% endblock %}
+
+{% block details %}
+    <fieldset>
+        <legend class="h6">{{ 'Details'|t('formie-campaigns') }}</legend>
+        <div class="meta">
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Campaign'|t('formie-campaigns') }}</label>
+                </div>
+                <div class="input">
+                    <a href="{{ cpUrl('formie-campaigns/' ~ campaignId ~ '/customers', {site: site.handle}) }}">{{ campaign.title }}</a>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+{% endblock %}
+
+{% block actionButton %}
+    <div class="btngroup">
+        <button type="submit" class="btn submit">{{ 'Add Customer'|t('formie-campaigns') }}</button>
+    </div>
+{% endblock %}
