@@ -39,7 +39,7 @@ class SettingsController extends Controller
     {
         $settings = SurveyCampaigns::$plugin->getSettings();
 
-        return $this->renderTemplate('survey-campaigns/settings/index', [
+        return $this->renderTemplate('formie-campaigns/settings/index', [
             'settings' => $settings,
         ]);
     }
@@ -72,7 +72,7 @@ class SettingsController extends Controller
         if (!$settings->validate()) {
             Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Couldn\'t save settings.'));
 
-            return $this->renderTemplate('survey-campaigns/settings/index', [
+            return $this->renderTemplate('formie-campaigns/settings/index', [
                 'settings' => $settings,
             ]);
         }
@@ -81,7 +81,7 @@ class SettingsController extends Controller
         if (!Craft::$app->getPlugins()->savePluginSettings(SurveyCampaigns::$plugin, $settings->toArray())) {
             Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Couldn\'t save settings.'));
 
-            return $this->renderTemplate('survey-campaigns/settings/index', [
+            return $this->renderTemplate('formie-campaigns/settings/index', [
                 'settings' => $settings,
             ]);
         }

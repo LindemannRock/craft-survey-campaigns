@@ -93,7 +93,7 @@ class CampaignSettingsField extends Field implements PreviewableFieldInterface
         }
 
         return $view->renderTemplate(
-            'survey-campaigns/fields/campaign-settings',
+            'formie-campaigns/fields/campaign-settings',
             [
                 'element' => $element,
                 'field' => $this,

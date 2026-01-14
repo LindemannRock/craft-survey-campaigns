@@ -344,10 +344,10 @@ class SurveyCampaigns extends Plugin
     private function getCpUrlRules(): array
     {
         return [
-            'formie-campaigns' => ['template' => 'survey-campaigns/campaigns/index'],
-            'formie-campaigns/<campaignId:\d+>/customers' => ['template' => 'survey-campaigns/campaigns/customers'],
-            'formie-campaigns/<campaignId:\d+>/add-customer' => ['template' => 'survey-campaigns/campaigns/addCustomer'],
-            'formie-campaigns/<campaignId:\d+>/import-customers' => ['template' => 'survey-campaigns/campaigns/importCustomers'],
+            'formie-campaigns' => ['template' => 'formie-campaigns/campaigns/index'],
+            'formie-campaigns/<campaignId:\d+>/customers' => ['template' => 'formie-campaigns/campaigns/customers'],
+            'formie-campaigns/<campaignId:\d+>/add-customer' => ['template' => 'formie-campaigns/campaigns/addCustomer'],
+            'formie-campaigns/<campaignId:\d+>/import-customers' => ['template' => 'formie-campaigns/campaigns/importCustomers'],
             'formie-campaigns/<campaignId:\d+>/export-customers' => 'formie-campaigns/customers/export-customers',
             'formie-campaigns/customers/load' => 'formie-campaigns/customers/load',
             'formie-campaigns/settings' => 'formie-campaigns/settings/index',
