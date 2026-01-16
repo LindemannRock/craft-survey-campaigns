@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.3](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.2...v5.0.3) (2026-01-16)
+
+
+### Bug Fixes
+
+* update PluginHelper bootstrap to include download permissions for logging ([bd33b61](https://github.com/LindemannRock/craft-survey-campaigns/commit/bd33b61e5d23c3be6cb4d8d3f92d4561c0940856))
+
 ## [5.0.2](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.1...v5.0.2) (2026-01-14)
 
 
