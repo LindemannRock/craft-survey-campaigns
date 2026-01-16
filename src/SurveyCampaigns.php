@@ -96,18 +96,13 @@ class SurveyCampaigns extends Plugin
         Craft::setAlias('@lindemannrock/surveycampaigns', __DIR__);
 
         // Bootstrap base module (logging + Twig extension)
-        PluginHelper::bootstrap($this, 'surveyCampaignsHelper', ['surveyCampaigns:viewCampaigns']);
+        PluginHelper::bootstrap(
+            $this,
+            'surveyCampaignsHelper',
+            ['surveyCampaigns:viewLogs'],
+            ['surveyCampaigns:downloadLogs']
+        );
         PluginHelper::applyPluginNameFromConfig($this);
-
-        // Configure logging
-        $settings = $this->getSettings();
-        LoggingLibrary::configure([
-            'pluginHandle' => $this->handle,
-            'pluginName' => $settings->getDisplayName(),
-            'logLevel' => $settings->logLevel ?? 'error',
-            'viewPermissions' => ['surveyCampaigns:viewLogs'],
-            'downloadPermissions' => ['surveyCampaigns:downloadLogs'],
-        ]);
 
         // Set up services
         $this->setComponents([
