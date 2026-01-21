@@ -13,6 +13,7 @@ use craft\base\ElementInterface;
 use craft\helpers\DateTimeHelper;
 use craft\models\Site;
 use DateInterval;
+use lindemannrock\surveycampaigns\helpers\PhoneHelper;
 use lindemannrock\surveycampaigns\helpers\TimeHelper;
 use lindemannrock\surveycampaigns\SurveyCampaigns;
 
@@ -59,9 +60,44 @@ class CustomerRecord extends BaseRecord
 
     /**
      * @inheritdoc
+     * @return array<array<mixed>>
+     */
+    public function rules(): array
+    {
+        return array_merge(parent::rules(), [
+            [['campaignId', 'siteId'], 'required'],
+            [['campaignId', 'siteId', 'submissionId'], 'integer'],
+            [['name', 'email', 'sms'], 'string', 'max' => 255],
+            ['email', 'email', 'skipOnEmpty' => true],
+            ['sms', 'validatePhone', 'skipOnEmpty' => true],
+        ]);
+    }
+
+    /**
+     * Validate the phone number
+     */
+    public function validatePhone(string $attribute): void
+    {
+        $value = $this->$attribute;
+        if ($value === null || $value === '') {
+            return;
+        }
+
+        $result = PhoneHelper::validate($value);
+        if (!$result['valid']) {
+            $this->addError($attribute, $result['error'] ?? 'Invalid phone number');
+        }
+    }
+
+    /**
+     * @inheritdoc
      */
     public function beforeSave($insert): bool
     {
+        // Sanitize phone number before saving
+        if ($this->sms !== null && $this->sms !== '') {
+            $this->sms = PhoneHelper::sanitize($this->sms);
+        }
         $invitationCode = SurveyCampaigns::$plugin->customers->getUniqueInvitationCode();
 
         if (empty($this->emailInvitationCode)) {

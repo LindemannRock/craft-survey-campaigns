@@ -12,7 +12,7 @@ use Craft;
 use craft\db\ActiveQuery;
 use craft\web\Controller;
 use craft\web\UploadedFile;
-use lindemannrock\surveycampaigns\jobs\ImportCustomersJob;
+use lindemannrock\surveycampaigns\helpers\PhoneHelper;
 use lindemannrock\surveycampaigns\records\CustomerRecord;
 use lindemannrock\surveycampaigns\SurveyCampaigns;
 use verbb\formie\Formie;
@@ -35,12 +35,26 @@ class CustomersController extends Controller
     {
         $this->requirePostRequest();
 
+        $sms = $this->request->getParam('sms');
+
+        // Validate and sanitize phone number
+        if ($sms !== null && $sms !== '') {
+            $phoneValidation = PhoneHelper::validate($sms);
+            if (!$phoneValidation['valid']) {
+                return $this->returnErrorResponse(
+                    $phoneValidation['error'] ?? 'Invalid phone number',
+                    ['field' => 'sms']
+                );
+            }
+            $sms = $phoneValidation['sanitized'];
+        }
+
         $customer = new CustomerRecord([
             'campaignId' => $this->request->getRequiredParam('campaignId'),
             'siteId' => $this->request->getRequiredParam('siteId'),
             'name' => $this->request->getRequiredParam('name'),
             'email' => $this->request->getParam('email'),
-            'sms' => $this->request->getParam('sms'),
+            'sms' => $sms,
         ]);
 
         if (!$customer->save()) {
@@ -209,55 +223,483 @@ class CustomersController extends Controller
     }
 
     /**
-     * Import customers from CSV (queued)
+     * Upload and parse CSV file (step 1 of import)
+     *
+     * @since 5.1.0
      */
-    public function actionImport(): ?Response
+    public function actionUpload(): Response
     {
         $this->requirePostRequest();
+        $this->requireLogin();
 
         $file = UploadedFile::getInstanceByName('file');
+        $campaignId = (int)$this->request->getRequiredParam('campaignId');
 
-        if (!$this->validateCSV($file)) {
-            return $this->returnErrorResponse('Invalid file type.');
+        if (!$file) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Please select a CSV file to upload'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
         }
 
-        if (empty($file)) {
-            return $this->returnErrorResponse('No file given.');
+        // Validate file type
+        if (!$this->validateCSV($file)) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Invalid file type. Please upload a CSV file.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+        }
+
+        $queueSending = (bool)$this->request->getBodyParam('queueSending', true);
+
+        // Save file temporarily for parsing
+        $tempPath = Craft::$app->getPath()->getTempPath() . '/customer-import-' . uniqid() . '.csv';
+
+        if (!$file->saveAs($tempPath)) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Failed to save uploaded file. Please try again.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+        }
+
+        // Parse CSV
+        try {
+            // Auto-detect delimiter from first line
+            $delimiter = $this->detectCsvDelimiter($tempPath);
+
+            $handle = fopen($tempPath, 'r');
+
+            if ($handle === false) {
+                throw new \Exception('Could not open uploaded file for reading.');
+            }
+
+            $headers = fgetcsv($handle, 0, $delimiter);
+
+            if (!$headers) {
+                fclose($handle);
+                throw new \Exception('Could not read CSV headers');
+            }
+
+            // Verify we got multiple columns (delimiter detection worked)
+            if (count($headers) === 1) {
+                fclose($handle);
+                throw new \Exception('Could not detect CSV delimiter. The file may have only one column or use an unsupported delimiter.');
+            }
+
+            // Read ALL rows into memory
+            $allRows = [];
+            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+                $allRows[] = $row;
+            }
+
+            fclose($handle);
+
+            // Delete temp file - we have the data in memory now
+            @unlink($tempPath);
+
+            $rowCount = count($allRows);
+
+            // Check for reasonable size limit
+            if ($rowCount > 4000) {
+                throw new \Exception('CSV file is too large. Maximum 4000 rows allowed for import. Please split your file into smaller batches.');
+            }
+
+            if ($rowCount === 0) {
+                throw new \Exception('CSV file is empty or contains only headers.');
+            }
+
+            // Store parsed data in session
+            Craft::$app->getSession()->set('customer-import', [
+                'headers' => $headers,
+                'allRows' => $allRows,
+                'rowCount' => $rowCount,
+                'campaignId' => $campaignId,
+                'queueSending' => $queueSending,
+            ]);
+
+            // Redirect to column mapping
+            $siteHandle = $this->request->getParam('site', 'en');
+            return $this->redirect("formie-campaigns/{$campaignId}/map-customers?site={$siteHandle}");
+        } catch (\Exception $e) {
+            // Clean up temp file on error
+            @unlink($tempPath);
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Failed to parse CSV: {error}', ['error' => $e->getMessage()]));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+        }
+    }
+
+    /**
+     * Map CSV columns (step 2 of import)
+     *
+     * @since 5.1.0
+     */
+    public function actionMap(int $campaignId): Response
+    {
+        $this->requireLogin();
+
+        // Get data from session
+        $importData = Craft::$app->getSession()->get('customer-import');
+
+        if (!$importData || !isset($importData['allRows'])) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'No import data found. Please upload a CSV file.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+        }
+
+        // Verify campaign ID matches
+        if ($importData['campaignId'] !== $campaignId) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Campaign mismatch. Please upload the CSV file again.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+        }
+
+        // Get first 5 rows for preview
+        $previewRows = array_slice($importData['allRows'], 0, 5);
+
+        return $this->renderTemplate('formie-campaigns/campaigns/mapCustomers', [
+            'headers' => $importData['headers'],
+            'previewRows' => $previewRows,
+            'rowCount' => $importData['rowCount'],
+            'queueSending' => $importData['queueSending'],
+            'campaignId' => $campaignId,
+        ]);
+    }
+
+    /**
+     * Preview import (step 3 of import - validates and shows preview)
+     *
+     * @since 5.1.0
+     */
+    public function actionPreview(): Response
+    {
+        $this->requireLogin();
+
+        // Handle GET request (page refresh) - check for existing preview data
+        if ($this->request->getIsGet()) {
+            $previewData = Craft::$app->getSession()->get('customer-import-preview');
+
+            if ($previewData && isset($previewData['previewRenderData'])) {
+                // Re-render from cached preview data
+                return $this->renderTemplate('formie-campaigns/campaigns/previewCustomers', $previewData['previewRenderData']);
+            }
+
+            // No preview data - redirect to import page
+            $campaignId = $this->request->getParam('campaignId');
+            if ($campaignId) {
+                Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Preview session expired. Please upload the file again.'));
+                return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+            }
+
+            // Fallback to main plugin page
+            return $this->redirect('formie-campaigns');
         }
 
         $campaignId = (int)$this->request->getRequiredParam('campaignId');
         $queueSending = (bool)$this->request->getParam('queueSending', true);
+        $mapping = $this->request->getBodyParam('mapping', []);
 
-        try {
-            // Save file to temp path with unique name to avoid conflicts
-            $uniqueName = uniqid('import_', true) . '_' . $file->name;
-            $path = Craft::$app->getPath()->getTempAssetUploadsPath() . DIRECTORY_SEPARATOR . $uniqueName;
-            $file->saveAs($path);
+        // Get data from session
+        $importData = Craft::$app->getSession()->get('customer-import');
 
-            // Queue the import job
-            Craft::$app->getQueue()->push(new ImportCustomersJob([
-                'campaignId' => $campaignId,
-                'csvPath' => $path,
-                'queueSending' => $queueSending,
-            ]));
-        } catch (\Exception $e) {
-            return $this->returnErrorResponse($e->getMessage());
+        if (!$importData || !isset($importData['allRows'])) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Import session expired. Please upload the file again.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
         }
 
-        $successResponse = [
-            'success' => true,
-            'message' => 'Import job queued. Check the queue for progress.',
+        // Create reverse mapping (column index => field name)
+        $columnMap = [];
+        foreach ($mapping as $colIndex => $fieldName) {
+            if (!empty($fieldName)) {
+                $columnMap[(int)$colIndex] = $fieldName;
+            }
+        }
+
+        // Validate required fields are mapped
+        $mappedFields = array_values($columnMap);
+        $errors = [];
+
+        if (!in_array('name', $mappedFields)) {
+            $errors[] = 'Name';
+        }
+
+        if (!in_array('email', $mappedFields) && !in_array('sms', $mappedFields)) {
+            $errors[] = 'Email or Phone';
+        }
+
+        if (!empty($errors)) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Required fields not mapped: {fields}', ['fields' => implode(', ', $errors)]));
+            $siteHandle = $this->request->getParam('site', 'en');
+            return $this->redirect("formie-campaigns/{$campaignId}/map-customers?site={$siteHandle}");
+        }
+
+        // Determine default site ID from form
+        $defaultSiteId = (int)$this->request->getBodyParam('defaultSiteId', 1);
+        $hasLanguageMapping = in_array('language', $mappedFields);
+
+        // Track duplicates within this CSV batch
+        $batchPhoneKeys = [];
+        $batchEmailKeys = [];
+
+        // Process rows and categorize them
+        $validRows = [];
+        $duplicateRows = [];
+        $errorRows = [];
+        $rowNumber = 0;
+
+        foreach ($importData['allRows'] as $row) {
+            $rowNumber++;
+
+            // Map CSV row to customer fields
+            $customerData = [
+                'name' => null,
+                'email' => null,
+                'sms' => null,
+                'language' => '',
+            ];
+
+            foreach ($columnMap as $colIndex => $fieldName) {
+                if (isset($row[$colIndex])) {
+                    $value = trim($row[$colIndex]);
+                    if ($value !== '') {
+                        $customerData[$fieldName] = $value;
+                    }
+                }
+            }
+
+            // Check for missing name
+            if (empty($customerData['name'])) {
+                $errorRows[] = [
+                    'rowNumber' => $rowNumber,
+                    'name' => $customerData['name'] ?? '-',
+                    'error' => Craft::t('formie-campaigns', 'Missing required field: Name'),
+                ];
+                continue;
+            }
+
+            // Check for missing contact method
+            if (empty($customerData['email']) && empty($customerData['sms'])) {
+                $errorRows[] = [
+                    'rowNumber' => $rowNumber,
+                    'name' => $customerData['name'],
+                    'error' => Craft::t('formie-campaigns', 'Missing required field: Email or Phone'),
+                ];
+                continue;
+            }
+
+            // Determine site ID from language column or use fallback
+            $language = $hasLanguageMapping ? strtolower(trim($customerData['language'] ?? '')) : '';
+            if ($language === 'ar') {
+                $siteId = 2;
+            } elseif ($language === 'en') {
+                $siteId = 1;
+            } else {
+                $siteId = $defaultSiteId;
+            }
+
+            // Get language code for display
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $languageCode = $site ? strtolower(substr($site->language, 0, 2)) : 'en';
+
+            // Validate and sanitize phone number
+            $sms = $customerData['sms'];
+            if ($sms !== null && $sms !== '') {
+                $phoneValidation = PhoneHelper::validate($sms);
+                if (!$phoneValidation['valid']) {
+                    $errorRows[] = [
+                        'rowNumber' => $rowNumber,
+                        'name' => $customerData['name'],
+                        'error' => $phoneValidation['error'] ?? Craft::t('formie-campaigns', 'Invalid phone number'),
+                    ];
+                    continue;
+                }
+                $sms = $phoneValidation['sanitized'];
+            }
+
+            // Validate email format
+            $email = !empty($customerData['email']) ? strtolower(trim($customerData['email'])) : null;
+            if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errorRows[] = [
+                    'rowNumber' => $rowNumber,
+                    'name' => $customerData['name'],
+                    'error' => Craft::t('formie-campaigns', 'Invalid email address: {email}', ['email' => $email]),
+                ];
+                continue;
+            }
+
+            // If we have no valid phone and no valid email, skip
+            $hasValidSms = $sms !== null && $sms !== '';
+            $hasValidEmail = $email !== null;
+            if (!$hasValidSms && !$hasValidEmail) {
+                $errorRows[] = [
+                    'rowNumber' => $rowNumber,
+                    'name' => $customerData['name'],
+                    'error' => Craft::t('formie-campaigns', 'No valid contact method (email or phone)'),
+                ];
+                continue;
+            }
+
+            // Check for duplicates within CSV by phone number (same site)
+            if (!empty($sms)) {
+                $phoneKey = $siteId . '|' . strtolower($sms);
+
+                if (isset($batchPhoneKeys[$phoneKey])) {
+                    $duplicateRows[] = [
+                        'rowNumber' => $rowNumber,
+                        'name' => $customerData['name'],
+                        'identifier' => $sms,
+                        'reason' => Craft::t('formie-campaigns', 'Same phone as row {row}', ['row' => $batchPhoneKeys[$phoneKey]]),
+                    ];
+                    continue;
+                }
+
+                $batchPhoneKeys[$phoneKey] = $rowNumber;
+            }
+
+            // Check for duplicates within CSV by email (same site) - only if no phone
+            if (empty($sms) && !empty($email)) {
+                $emailKey = $siteId . '|' . $email;
+
+                if (isset($batchEmailKeys[$emailKey])) {
+                    $duplicateRows[] = [
+                        'rowNumber' => $rowNumber,
+                        'name' => $customerData['name'],
+                        'identifier' => $email,
+                        'reason' => Craft::t('formie-campaigns', 'Same email as row {row}', ['row' => $batchEmailKeys[$emailKey]]),
+                    ];
+                    continue;
+                }
+
+                $batchEmailKeys[$emailKey] = $rowNumber;
+            }
+
+            // Row is valid - add to valid rows
+            $validRows[] = [
+                'name' => $customerData['name'],
+                'email' => $email,
+                'sms' => $sms,
+                'siteId' => $siteId,
+                'language' => $languageCode,
+            ];
+        }
+
+        // Build summary
+        $summary = [
+            'totalRows' => count($importData['allRows']),
+            'validRows' => count($validRows),
+            'duplicates' => count($duplicateRows),
+            'errors' => count($errorRows),
         ];
 
-        if (Craft::$app->getRequest()->getAcceptsJson()) {
-            return $this->asJson($successResponse);
+        // Build render data for template
+        $renderData = [
+            'summary' => $summary,
+            'validRows' => $validRows,
+            'duplicateRows' => $duplicateRows,
+            'errorRows' => $errorRows,
+            'campaignId' => $campaignId,
+            'queueSending' => $queueSending,
+        ];
+
+        // Store validated data in session for import step (and for page refresh)
+        Craft::$app->getSession()->set('customer-import-preview', [
+            'validRows' => $validRows,
+            'campaignId' => $campaignId,
+            'queueSending' => $queueSending,
+            'previewRenderData' => $renderData,
+        ]);
+
+        return $this->renderTemplate('formie-campaigns/campaigns/previewCustomers', $renderData);
+    }
+
+    /**
+     * Import customers from preview (step 4 of import - actual import)
+     *
+     * @since 5.1.0
+     */
+    public function actionImport(): ?Response
+    {
+        $this->requirePostRequest();
+        $this->requireLogin();
+
+        $campaignId = (int)$this->request->getRequiredParam('campaignId');
+
+        // Get validated data from preview session
+        $previewData = Craft::$app->getSession()->get('customer-import-preview');
+
+        if (!$previewData || !isset($previewData['validRows'])) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Import session expired. Please upload the file again.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
         }
 
-        Craft::$app->getSession()->setNotice(
-            Craft::t('formie-campaigns', 'Import job queued. Check the queue for progress.')
-        );
+        // Verify campaign ID matches
+        if ($previewData['campaignId'] !== $campaignId) {
+            Craft::$app->getSession()->setError(Craft::t('formie-campaigns', 'Campaign mismatch. Please upload the CSV file again.'));
+            return $this->redirect("formie-campaigns/{$campaignId}/import-customers");
+        }
 
-        return $this->redirectToPostedUrl();
+        $queueSending = $previewData['queueSending'];
+        $validRows = $previewData['validRows'];
+
+        // Import validated rows
+        $imported = 0;
+        $failed = 0;
+        $errorMessages = [];
+
+        foreach ($validRows as $index => $rowData) {
+            $customer = new CustomerRecord([
+                'campaignId' => $campaignId,
+                'siteId' => $rowData['siteId'],
+                'name' => $rowData['name'],
+                'email' => $rowData['email'],
+                'sms' => $rowData['sms'],
+            ]);
+
+            try {
+                if ($customer->save()) {
+                    $imported++;
+                } else {
+                    $failed++;
+                    $errorMessages[] = "Row " . ($index + 1) . ": " . implode(', ', $customer->getErrorSummary(true));
+                }
+            } catch (\Exception $e) {
+                $failed++;
+                $errorMessages[] = "Row " . ($index + 1) . ": " . $e->getMessage();
+            }
+        }
+
+        // Clean up session data
+        Craft::$app->getSession()->remove('customer-import');
+        Craft::$app->getSession()->remove('customer-import-preview');
+
+        // Build result message
+        $message = Craft::t('formie-campaigns', 'Successfully imported {imported} customer(s).', ['imported' => $imported]);
+        if ($failed > 0) {
+            $message .= ' ' . Craft::t('formie-campaigns', '{failed} failed.', ['failed' => $failed]);
+        }
+
+        // Queue sending if requested and we imported customers
+        if ($queueSending && $imported > 0) {
+            // Get unique site IDs from imported customers
+            $siteIds = CustomerRecord::find()
+                ->select(['siteId'])
+                ->where(['campaignId' => $campaignId])
+                ->andWhere(['smsSendDate' => null])
+                ->andWhere(['emailSendDate' => null])
+                ->distinct()
+                ->column();
+
+            foreach ($siteIds as $siteId) {
+                Craft::$app->getQueue()->push(new \lindemannrock\surveycampaigns\jobs\ProcessCampaignJob([
+                    'campaignId' => $campaignId,
+                    'siteId' => (int)$siteId,
+                    'sendSms' => true,
+                    'sendEmail' => true,
+                ]));
+            }
+
+            $message .= ' ' . Craft::t('formie-campaigns', 'Invitation sending has been queued.');
+        }
+
+        if ($failed > 0 && count($errorMessages) <= 10) {
+            Craft::warning('Customer import errors: ' . implode('; ', $errorMessages), 'formie-campaigns');
+        }
+
+        Craft::$app->getSession()->setNotice($message);
+
+        $siteHandle = $this->request->getParam('site', 'en');
+        return $this->redirect("formie-campaigns/{$campaignId}/customers?site={$siteHandle}");
     }
 
     /**
@@ -411,6 +853,52 @@ class CustomersController extends Controller
     }
 
     /**
+     * Auto-detect CSV delimiter from file content
+     *
+     * @since 5.1.0
+     */
+    private function detectCsvDelimiter(string $filePath): string
+    {
+        $delimiters = [
+            ',' => 0,
+            ';' => 0,
+            "\t" => 0,
+            '|' => 0,
+        ];
+
+        // Read first few lines to detect delimiter
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            return ','; // Default to comma
+        }
+
+        $linesToCheck = 3;
+        $linesChecked = 0;
+
+        while (($line = fgets($handle)) !== false && $linesChecked < $linesToCheck) {
+            foreach ($delimiters as $delimiter => $count) {
+                $delimiters[$delimiter] += substr_count($line, $delimiter);
+            }
+            $linesChecked++;
+        }
+
+        fclose($handle);
+
+        // Find delimiter with highest count
+        $maxCount = 0;
+        $detected = ',';
+
+        foreach ($delimiters as $delimiter => $count) {
+            if ($count > $maxCount) {
+                $maxCount = $count;
+                $detected = $delimiter;
+            }
+        }
+
+        return $detected;
+    }
+
+    /**
      * Validate a CSV file
      */
     private function validateCSV(?UploadedFile $file): bool
@@ -432,7 +920,8 @@ class CustomersController extends Controller
             'application/txt',
         ];
 
-        if ($file->getExtension() !== 'csv') {
+        $extension = strtolower($file->getExtension());
+        if (!in_array($extension, ['csv', 'txt'])) {
             return false;
         }
 

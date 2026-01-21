@@ -30,10 +30,13 @@ use craft\web\View;
 use lindemannrock\base\helpers\PluginHelper;
 use lindemannrock\logginglibrary\LoggingLibrary;
 use lindemannrock\logginglibrary\traits\LoggingTrait;
+use lindemannrock\smsmanager\events\RegisterIntegrationsEvent as SmsManagerRegisterIntegrationsEvent;
+use lindemannrock\smsmanager\services\IntegrationsService as SmsManagerIntegrationsService;
 use lindemannrock\surveycampaigns\behaviors\CampaignBehavior;
 use lindemannrock\surveycampaigns\behaviors\CampaignQueryBehavior;
 use lindemannrock\surveycampaigns\behaviors\FormBehavior;
 use lindemannrock\surveycampaigns\fields\CampaignSettingsField;
+use lindemannrock\surveycampaigns\integrations\SmsManagerIntegration;
 use lindemannrock\surveycampaigns\models\Settings;
 use lindemannrock\surveycampaigns\services\CampaignsService;
 use lindemannrock\surveycampaigns\services\CustomersService;
@@ -264,6 +267,15 @@ class SurveyCampaigns extends Plugin
             }
         );
 
+        // Register with SMS Manager's integration system (for usage tracking)
+        Event::on(
+            SmsManagerIntegrationsService::class,
+            SmsManagerIntegrationsService::EVENT_REGISTER_INTEGRATIONS,
+            function(SmsManagerRegisterIntegrationsEvent $event) {
+                $event->register('survey-campaigns', 'Survey Campaigns', SmsManagerIntegration::class);
+            }
+        );
+
         // Register template roots
         Event::on(
             View::class,
@@ -343,6 +355,7 @@ class SurveyCampaigns extends Plugin
             'formie-campaigns/<campaignId:\d+>/customers' => ['template' => 'formie-campaigns/campaigns/customers'],
             'formie-campaigns/<campaignId:\d+>/add-customer' => ['template' => 'formie-campaigns/campaigns/addCustomer'],
             'formie-campaigns/<campaignId:\d+>/import-customers' => ['template' => 'formie-campaigns/campaigns/importCustomers'],
+            'formie-campaigns/<campaignId:\d+>/map-customers' => 'formie-campaigns/customers/map',
             'formie-campaigns/<campaignId:\d+>/export-customers' => 'formie-campaigns/customers/export-customers',
             'formie-campaigns/customers/load' => 'formie-campaigns/customers/load',
             'formie-campaigns/settings' => 'formie-campaigns/settings/index',

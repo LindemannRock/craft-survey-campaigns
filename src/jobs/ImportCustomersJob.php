@@ -12,6 +12,7 @@ use Craft;
 use craft\queue\BaseJob;
 use Exception;
 use lindemannrock\logginglibrary\traits\LoggingTrait;
+use lindemannrock\surveycampaigns\helpers\PhoneHelper;
 use lindemannrock\surveycampaigns\records\CustomerRecord;
 use yii\queue\RetryableJobInterface;
 
@@ -85,6 +86,7 @@ class ImportCustomersJob extends BaseJob implements RetryableJobInterface
         $totalRows = 0;
         $totalSaved = 0;
         $errors = 0;
+        $skipped = 0;
         $siteIdsWithCustomers = [];
         $batch = [];
 
@@ -118,12 +120,33 @@ class ImportCustomersJob extends BaseJob implements RetryableJobInterface
                 $language = $row[3] ?? 'en';
                 $siteId = $language === 'ar' ? 2 : 1;
 
+                $name = $row[0];
+                $email = !empty($row[1]) ? trim($row[1]) : null;
+                $sms = !empty($row[2]) ? trim($row[2]) : null;
+
+                // Pre-validate phone number before creating record
+                if ($sms !== null) {
+                    $phoneValidation = PhoneHelper::validate($sms);
+                    if (!$phoneValidation['valid']) {
+                        $skipped++;
+                        $this->logWarning('Skipping row with invalid phone', [
+                            'row' => $totalRows,
+                            'name' => $name,
+                            'sms' => $sms,
+                            'error' => $phoneValidation['error'],
+                        ]);
+                        continue;
+                    }
+                    // Use sanitized version
+                    $sms = $phoneValidation['sanitized'];
+                }
+
                 $customer = new CustomerRecord([
                     'campaignId' => $this->campaignId,
                     'siteId' => $siteId,
-                    'name' => $row[0],
-                    'email' => !empty($row[1]) ? $row[1] : null,
-                    'sms' => !empty($row[2]) ? $row[2] : null,
+                    'name' => $name,
+                    'email' => $email,
+                    'sms' => $sms,
                 ]);
 
                 $batch[] = $customer;
@@ -169,6 +192,7 @@ class ImportCustomersJob extends BaseJob implements RetryableJobInterface
             'campaignId' => $this->campaignId,
             'totalRows' => $totalRows,
             'totalSaved' => $totalSaved,
+            'skipped' => $skipped,
             'errors' => $errors,
             'sitesWithCustomers' => $siteIdsWithCustomers,
         ]);

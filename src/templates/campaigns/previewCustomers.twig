@@ -1,0 +1,250 @@
+{% extends "_layouts/cp" %}
+{% import "_includes/forms" as forms %}
+
+{% set plugin = craft.app.plugins.getPlugin('formie-campaigns') %}
+{% set settings = plugin.getSettings() %}
+
+{# Site handling #}
+{% set siteHandle = craft.app.request.getParam('site') %}
+{% set site = siteHandle ? craft.app.getSites().getSiteByHandle(siteHandle) : craft.app.sites.getPrimarySite() %}
+
+{# Get campaign #}
+{% set campaign = formieCampaigns.campaigns.find().id(campaignId).siteId(site.id).one() %}
+{% if not campaign %}
+    {% exit 404 %}
+{% endif %}
+
+{% set title = 'Preview Import'|t('formie-campaigns') %}
+{% set fullPageForm = false %}
+{% set selectedSubnavItem = 'campaigns' %}
+
+{% set crumbs = [] %}
+{% if craft.app.getIsMultiSite() %}
+    {% set siteMenuItems = [] %}
+    {% for s in craft.app.sites.getAllSites() %}
+        {% set siteMenuItems = siteMenuItems|merge([{
+            label: s.name,
+            url: cpUrl('formie-campaigns/' ~ campaignId ~ '/import-customers', {site: s.handle}),
+            selected: s.handle == site.handle
+        }]) %}
+    {% endfor %}
+
+    {% set crumbs = [{
+        id: 'site-crumb',
+        icon: 'world',
+        label: site.name|t('site'),
+        menu: {
+            items: siteMenuItems,
+            label: 'Select site'|t('app')
+        }
+    }] %}
+{% endif %}
+
+{% set crumbs = crumbs|merge([
+    { label: settings.pluginName, url: cpUrl('formie-campaigns', {site: site.handle}) },
+    { label: campaign.title, url: cpUrl('formie-campaigns/' ~ campaignId ~ '/customers', {site: site.handle}) },
+    { label: 'Import Customers'|t('formie-campaigns'), url: cpUrl('formie-campaigns/' ~ campaignId ~ '/import-customers', {site: site.handle}) },
+]) %}
+
+{% block content %}
+    <h2 style="margin-top: 0;">{{ 'Import Preview'|t('formie-campaigns') }}</h2>
+
+    {# Summary Cards #}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 30px 0;">
+        <div style="background: #f7f7f7; padding: 20px; border-radius: 4px; text-align: center; border: 1px solid #e0e0e0;">
+            <div style="font-size: 32px; font-weight: bold; color: #333;">{{ summary.totalRows|number }}</div>
+            <div style="color: #666; margin-top: 5px;">{{ 'Total Rows'|t('formie-campaigns') }}</div>
+        </div>
+        <div style="background: #e8f5e9; padding: 20px; border-radius: 4px; text-align: center; border: 1px solid #a5d6a7;">
+            <div style="font-size: 32px; font-weight: bold; color: #28a745;">{{ summary.validRows|number }}</div>
+            <div style="color: #666; margin-top: 5px;">{{ 'Valid'|t('formie-campaigns') }}</div>
+        </div>
+        <div style="background: #fff3cd; padding: 20px; border-radius: 4px; text-align: center; border: 1px solid #ffd966;">
+            <div style="font-size: 32px; font-weight: bold; color: #f59e0b;">{{ summary.duplicates|number }}</div>
+            <div style="color: #666; margin-top: 5px;">{{ 'Duplicates'|t('formie-campaigns') }}</div>
+        </div>
+        <div style="background: #f8d7da; padding: 20px; border-radius: 4px; text-align: center; border: 1px solid #f5c2c7;">
+            <div style="font-size: 32px; font-weight: bold; color: #dc3545;">{{ summary.errors|number }}</div>
+            <div style="color: #666; margin-top: 5px;">{{ 'Errors'|t('formie-campaigns') }}</div>
+        </div>
+    </div>
+
+    {% if summary.validRows > 0 %}
+        {% if queueSending %}
+            {% include 'lindemannrock-base/_components/info-box' with {
+                message: '<strong>' ~ 'Invitation sending will be queued after import.'|t('formie-campaigns') ~ '</strong>',
+                type: 'success',
+                variant: 'colored',
+                margin: 'bottom'
+            } %}
+        {% else %}
+            {% include 'lindemannrock-base/_components/info-box' with {
+                message: '<strong>' ~ 'Invitations will not be sent automatically. You can send them later from the customers list.'|t('formie-campaigns') ~ '</strong>',
+                type: 'info',
+                variant: 'colored',
+                margin: 'bottom'
+            } %}
+        {% endif %}
+    {% endif %}
+
+    {# Valid Rows #}
+    {% if validRows|length > 0 %}
+        <hr>
+        <h3>{{ 'Valid Customers to Import'|t('formie-campaigns') }} ({{ validRows|length }})</h3>
+        <div style="max-height: 400px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 4px;">
+            <table class="data fullwidth" style="margin: 0;">
+                <thead style="position: sticky; top: 0; background: #f7f7f7; z-index: 1;">
+                    <tr>
+                        <th>{{ 'Name'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Email'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Phone'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Language'|t('formie-campaigns') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in validRows|slice(0, 100) %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td><code style="font-size: 11px;">{{ row.email ?? '-' }}</code></td>
+                            <td><code style="font-size: 11px;">{{ row.sms ?? '-' }}</code></td>
+                            <td>{{ row.language|upper }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if validRows|length > 100 %}
+            <p class="light" style="margin-top: 10px;">{{ 'Showing first 100 rows. {total} total will be imported.'|t('formie-campaigns', {total: validRows|length}) }}</p>
+        {% endif %}
+    {% endif %}
+
+    {# Duplicate Rows #}
+    {% if duplicateRows|length > 0 %}
+        <hr>
+        <h3>{{ 'Duplicates (will be skipped)'|t('formie-campaigns') }} ({{ duplicateRows|length }})</h3>
+        <p class="light">{{ 'These customers have the same phone number or email as another row in the CSV.'|t('formie-campaigns') }}</p>
+        <div style="max-height: 300px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 4px;">
+            <table class="data fullwidth" style="margin: 0;">
+                <thead style="position: sticky; top: 0; background: #fffbf0; z-index: 1;">
+                    <tr>
+                        <th style="width: 80px;">{{ 'Row'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Name'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Phone/Email'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Reason'|t('formie-campaigns') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in duplicateRows %}
+                        <tr>
+                            <td>{{ row.rowNumber }}</td>
+                            <td>{{ row.name }}</td>
+                            <td><code style="font-size: 11px;">{{ row.identifier }}</code></td>
+                            <td class="light">{{ row.reason }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {# Error Rows #}
+    {% if errorRows|length > 0 %}
+        <hr>
+        <h3>{{ 'Invalid Rows (will be skipped)'|t('formie-campaigns') }} ({{ errorRows|length }})</h3>
+        <div style="max-height: 300px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 4px;">
+            <table class="data fullwidth" style="margin: 0;">
+                <thead style="position: sticky; top: 0; background: #fef2f2; z-index: 1;">
+                    <tr>
+                        <th style="width: 80px;">{{ 'Row'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Name'|t('formie-campaigns') }}</th>
+                        <th>{{ 'Error'|t('formie-campaigns') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in errorRows %}
+                        <tr>
+                            <td>{{ row.rowNumber }}</td>
+                            <td>{{ row.name ?? '-' }}</td>
+                            <td style="color: #dc3545;">{{ row.error }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    <hr>
+
+    {# Import Form #}
+    <form method="post" action="{{ actionUrl('formie-campaigns/customers/import') }}" id="importForm">
+        {{ csrfInput() }}
+        {{ hiddenInput('campaignId', campaignId) }}
+
+        <div style="background: #f7f7f7; padding: 20px; border-radius: 4px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">{{ 'Ready to Import'|t('formie-campaigns') }}</h3>
+            <p>
+                {% if summary.validRows > 0 %}
+                    {{ 'Click the button below to import {count} valid customer(s).'|t('formie-campaigns', {count: summary.validRows}) }}
+                    {% if summary.duplicates > 0 %}
+                        {{ '{duplicates} duplicate(s) will be skipped.'|t('formie-campaigns', {duplicates: summary.duplicates}) }}
+                    {% endif %}
+                    {% if summary.errors > 0 %}
+                        {{ '{errors} invalid row(s) will be skipped.'|t('formie-campaigns', {errors: summary.errors}) }}
+                    {% endif %}
+                {% else %}
+                    {{ 'No valid customers found to import.'|t('formie-campaigns') }}
+                {% endif %}
+            </p>
+
+            <div class="buttons" style="margin-top: 15px;">
+                <a href="{{ cpUrl('formie-campaigns/' ~ campaignId ~ '/import-customers', {site: site.handle}) }}" class="btn">{{ 'Cancel'|t('formie-campaigns') }}</a>
+                {% if summary.validRows > 0 %}
+                    <button type="submit" class="btn submit">
+                        {{ 'Import {count} Customers'|t('formie-campaigns', {count: summary.validRows}) }}
+                    </button>
+                {% else %}
+                    <button type="button" class="btn disabled" disabled>
+                        {{ 'No Valid Customers to Import'|t('formie-campaigns') }}
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+{% endblock %}
+
+{% block details %}
+    <fieldset>
+        <div class="meta">
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Campaign'|t('formie-campaigns') }}</label>
+                </div>
+                <div class="input">
+                    <a href="{{ cpUrl('formie-campaigns/' ~ campaignId ~ '/customers', {site: site.handle}) }}">{{ campaign.title }}</a>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Send Invitations'|t('formie-campaigns') }}</label>
+                </div>
+                <div class="input">
+                    {{ queueSending ? 'Yes'|t('formie-campaigns') : 'No'|t('formie-campaigns') }}
+                </div>
+            </div>
+        </div>
+    </fieldset>
+{% endblock %}
+
+{% js %}
+    const importForm = document.getElementById('importForm');
+    if (importForm) {
+        importForm.addEventListener('submit', function(e) {
+            const count = {{ summary.validRows }};
+            if (!confirm('Import ' + count + ' customer(s)?')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
+{% endjs %}
