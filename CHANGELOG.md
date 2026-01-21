@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.1.0](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.3...v5.1.0) (2026-01-21)
+
+
+### Features
+
+* add CSV import preview step with column mapping and validation ([f84c579](https://github.com/LindemannRock/craft-survey-campaigns/commit/f84c579714c0abf6b7fe9426a5ab5dd8505527ee))
+
 ## [5.0.3](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.2...v5.0.3) (2026-01-16)
 
 
