@@ -14,6 +14,7 @@ use Exception;
 use lindemannrock\logginglibrary\traits\LoggingTrait;
 use lindemannrock\surveycampaigns\records\CampaignRecord;
 use lindemannrock\surveycampaigns\records\CustomerRecord;
+use lindemannrock\surveycampaigns\SurveyCampaigns;
 use yii\queue\RetryableJobInterface;
 
 /**
@@ -65,7 +66,11 @@ class ProcessCampaignJob extends BaseJob implements RetryableJobInterface
      */
     protected function defaultDescription(): ?string
     {
-        return Craft::t('formie-campaigns', 'Processing campaign #{id}', ['id' => $this->campaignId]);
+        $settings = SurveyCampaigns::$plugin->getSettings();
+        return Craft::t('formie-campaigns', '{pluginName}: Processing campaign #{id}', [
+            'pluginName' => $settings->getDisplayName(),
+            'id' => $this->campaignId,
+        ]);
     }
 
     /**

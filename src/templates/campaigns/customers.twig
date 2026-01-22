@@ -20,8 +20,8 @@
 
 {# Get query parameters #}
 {% set search = craft.app.request.getParam('search', '') %}
-{% set sort = craft.app.request.getParam('sort', 'name') %}
-{% set dir = craft.app.request.getParam('dir', 'asc') %}
+{% set sort = craft.app.request.getParam('sort', 'sent') %}
+{% set dir = craft.app.request.getParam('dir', 'desc') %}
 {% set dateRange = craft.app.request.getParam('dateRange', 'all') %}
 {% set page = craft.app.request.getParam('page', 1)|number_format(0, '', '') %}
 {% set limit = 50 %}
@@ -50,6 +50,12 @@
     {% set allCustomers = dir == 'asc' ? allCustomers|sort((a, b) => a.name|lower <=> b.name|lower) : allCustomers|sort((a, b) => b.name|lower <=> a.name|lower) %}
 {% elseif sort == 'email' %}
     {% set allCustomers = dir == 'asc' ? allCustomers|sort((a, b) => (a.email ?? '')|lower <=> (b.email ?? '')|lower) : allCustomers|sort((a, b) => (b.email ?? '')|lower <=> (a.email ?? '')|lower) %}
+{% elseif sort == 'sms' %}
+    {% set allCustomers = dir == 'asc' ? allCustomers|sort((a, b) => (a.sms ?? '') <=> (b.sms ?? '')) : allCustomers|sort((a, b) => (b.sms ?? '') <=> (a.sms ?? '')) %}
+{% elseif sort == 'sent' %}
+    {% set allCustomers = dir == 'asc' ? allCustomers|sort((a, b) => (a.smsSendDate ?? a.emailSendDate ?? '')|date('U') <=> (b.smsSendDate ?? b.emailSendDate ?? '')|date('U')) : allCustomers|sort((a, b) => (b.smsSendDate ?? b.emailSendDate ?? '')|date('U') <=> (a.smsSendDate ?? a.emailSendDate ?? '')|date('U')) %}
+{% elseif sort == 'opened' %}
+    {% set allCustomers = dir == 'asc' ? allCustomers|sort((a, b) => (a.smsOpenDate ?? a.emailOpenDate ?? '')|date('U') <=> (b.smsOpenDate ?? b.emailOpenDate ?? '')|date('U')) : allCustomers|sort((a, b) => (b.smsOpenDate ?? b.emailOpenDate ?? '')|date('U') <=> (a.smsOpenDate ?? a.emailOpenDate ?? '')|date('U')) %}
 {% endif %}
 
 {# Pagination #}
@@ -193,10 +199,16 @@
                         <th scope="col" data-attribute="email" class="orderable {{ sort == 'email' ? 'ordered ' ~ dir : '' }}">
                             <button type="button" data-sort="email">{{ "Email"|t('formie-campaigns') }}</button>
                         </th>
-                        <th scope="col">{{ "SMS"|t('formie-campaigns') }}</th>
+                        <th scope="col" data-attribute="sms" class="orderable {{ sort == 'sms' ? 'ordered ' ~ dir : '' }}">
+                            <button type="button" data-sort="sms">{{ "SMS"|t('formie-campaigns') }}</button>
+                        </th>
                         <th scope="col">{{ "Code"|t('formie-campaigns') }}</th>
-                        <th scope="col">{{ "Sent"|t('formie-campaigns') }}</th>
-                        <th scope="col">{{ "Opened"|t('formie-campaigns') }}</th>
+                        <th scope="col" data-attribute="sent" class="orderable {{ sort == 'sent' ? 'ordered ' ~ dir : '' }}">
+                            <button type="button" data-sort="sent">{{ "Sent"|t('formie-campaigns') }}</button>
+                        </th>
+                        <th scope="col" data-attribute="opened" class="orderable {{ sort == 'opened' ? 'ordered ' ~ dir : '' }}">
+                            <button type="button" data-sort="opened">{{ "Opened"|t('formie-campaigns') }}</button>
+                        </th>
                         <th scope="col">{{ "Submission"|t('formie-campaigns') }}</th>
                         <th scope="col" class="thin">{{ "Actions"|t('formie-campaigns') }}</th>
                     </tr>

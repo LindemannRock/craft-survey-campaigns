@@ -14,8 +14,8 @@
 
 {# Get query parameters #}
 {% set search = craft.app.request.getParam('search', '') %}
-{% set sort = craft.app.request.getParam('sort', 'title') %}
-{% set dir = craft.app.request.getParam('dir', 'asc') %}
+{% set sort = craft.app.request.getParam('sort', 'sent') %}
+{% set dir = craft.app.request.getParam('dir', 'desc') %}
 {% set page = craft.app.request.getParam('page', 1)|number_format(0, '', '') %}
 {% set limit = 50 %}
 {% set offset = (page - 1) * limit %}
@@ -31,6 +31,10 @@
 {# Sort #}
 {% if sort == 'title' %}
     {% set allCampaigns = dir == 'asc' ? allCampaigns|sort((a, b) => a.title|lower <=> b.title|lower) : allCampaigns|sort((a, b) => b.title|lower <=> a.title|lower) %}
+{% elseif sort == 'sent' %}
+    {% set allCampaigns = dir == 'asc' ? allCampaigns|sort((a, b) => a.getSentCountBySiteId(site.id) <=> b.getSentCountBySiteId(site.id)) : allCampaigns|sort((a, b) => b.getSentCountBySiteId(site.id) <=> a.getSentCountBySiteId(site.id)) %}
+{% elseif sort == 'smsOpened' %}
+    {% set allCampaigns = dir == 'asc' ? allCampaigns|sort((a, b) => a.getSmsOpenedCountBySiteId(site.id) <=> b.getSmsOpenedCountBySiteId(site.id)) : allCampaigns|sort((a, b) => b.getSmsOpenedCountBySiteId(site.id) <=> a.getSmsOpenedCountBySiteId(site.id)) %}
 {% endif %}
 
 {# Pagination #}
@@ -134,6 +138,12 @@
                         </th>
                         <th scope="col">{{ "Type"|t('formie-campaigns') }}</th>
                         <th scope="col">{{ "Customers"|t('formie-campaigns') }}</th>
+                        <th scope="col" data-attribute="sent" class="orderable {{ sort == 'sent' ? 'ordered ' ~ dir : '' }}">
+                            <button type="button" data-sort="sent">{{ "Sent"|t('formie-campaigns') }}</button>
+                        </th>
+                        <th scope="col" data-attribute="smsOpened" class="orderable {{ sort == 'smsOpened' ? 'ordered ' ~ dir : '' }}">
+                            <button type="button" data-sort="smsOpened">{{ "SMS Opened"|t('formie-campaigns') }}</button>
+                        </th>
                         <th scope="col">{{ "Submissions"|t('formie-campaigns') }}</th>
                         <th scope="col" class="thin">{{ "Actions"|t('formie-campaigns') }}</th>
                     </tr>
@@ -160,7 +170,13 @@
                                     </a>
                                 </td>
                                 <td>
-                                    <span>{{ campaign.getSubmissionCount() }} {{ 'submissions'|t('formie-campaigns') }}</span>
+                                    <span>{{ campaign.getSentCountBySiteId(site.id)|number }}</span>
+                                </td>
+                                <td>
+                                    <span>{{ campaign.getSmsOpenedCountBySiteId(site.id)|number }}</span>
+                                </td>
+                                <td>
+                                    <span>{{ campaign.getSubmissionCount()|number }} {{ 'submissions'|t('formie-campaigns') }}</span>
                                 </td>
                                 <td class="thin" style="text-align: right;">
                                     <button type="button" class="btn menubtn" data-icon="settings" title="{{ 'Actions'|t('formie-campaigns') }}"></button>
@@ -189,7 +205,7 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="5" style="text-align: center; padding: 2em;">
+                            <td colspan="7" style="text-align: center; padding: 2em;">
                                 {{ 'No campaigns found.'|t('formie-campaigns') }}
                             </td>
                         </tr>

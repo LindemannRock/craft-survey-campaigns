@@ -14,6 +14,7 @@ use Exception;
 use lindemannrock\logginglibrary\traits\LoggingTrait;
 use lindemannrock\surveycampaigns\helpers\PhoneHelper;
 use lindemannrock\surveycampaigns\records\CustomerRecord;
+use lindemannrock\surveycampaigns\SurveyCampaigns;
 use yii\queue\RetryableJobInterface;
 
 /**
@@ -61,7 +62,11 @@ class ImportCustomersJob extends BaseJob implements RetryableJobInterface
      */
     protected function defaultDescription(): ?string
     {
-        return Craft::t('formie-campaigns', 'Importing customers for campaign #{id}', ['id' => $this->campaignId]);
+        $settings = SurveyCampaigns::$plugin->getSettings();
+        return Craft::t('formie-campaigns', '{pluginName}: Importing customers for campaign #{id}', [
+            'pluginName' => $settings->getDisplayName(),
+            'id' => $this->campaignId,
+        ]);
     }
 
     /**

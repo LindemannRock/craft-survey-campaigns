@@ -54,6 +54,10 @@ class CampaignBehavior extends Behavior
 
     private ?int $_submissionCount = null;
 
+    private ?int $_sentCount = null;
+
+    private ?int $_smsOpenedCount = null;
+
     /**
      * @var array<string, mixed>|null Pending attributes to save
      */
@@ -296,6 +300,52 @@ class CampaignBehavior extends Behavior
         }
 
         return $this->_submissionCount;
+    }
+
+    public function getSentCount(): int
+    {
+        if (!isset($this->_sentCount)) {
+            $customersWithSent = array_filter(
+                $this->getCustomers(),
+                fn(CustomerRecord $customer) => $customer->smsSendDate !== null || $customer->emailSendDate !== null
+            );
+            $this->_sentCount = count($customersWithSent);
+        }
+
+        return $this->_sentCount;
+    }
+
+    public function getSentCountBySiteId(int $siteId): int
+    {
+        $customersWithSent = array_filter(
+            $this->getCustomersBySiteId($siteId),
+            fn(CustomerRecord $customer) => $customer->smsSendDate !== null || $customer->emailSendDate !== null
+        );
+
+        return count($customersWithSent);
+    }
+
+    public function getSmsOpenedCount(): int
+    {
+        if (!isset($this->_smsOpenedCount)) {
+            $customersWithSmsOpened = array_filter(
+                $this->getCustomers(),
+                fn(CustomerRecord $customer) => $customer->smsOpenDate !== null
+            );
+            $this->_smsOpenedCount = count($customersWithSmsOpened);
+        }
+
+        return $this->_smsOpenedCount;
+    }
+
+    public function getSmsOpenedCountBySiteId(int $siteId): int
+    {
+        $customersWithSmsOpened = array_filter(
+            $this->getCustomersBySiteId($siteId),
+            fn(CustomerRecord $customer) => $customer->smsOpenDate !== null
+        );
+
+        return count($customersWithSmsOpened);
     }
 
     public function getForm(): ?Form

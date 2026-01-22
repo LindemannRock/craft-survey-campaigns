@@ -191,6 +191,14 @@
 {% block details %}
     <fieldset>
         <div class="meta">
+            {{ forms.lightswitchField({
+                label: 'Send Invitations'|t('formie-campaigns'),
+                instructions: 'Queue invitation sending after import.'|t('formie-campaigns'),
+                id: 'queueSendingToggle',
+                name: 'queueSendingToggle',
+                on: queueSending
+            }) }}
+
             <div class="field">
                 <div class="heading">
                     <label>{{ 'Campaign'|t('formie-campaigns') }}</label>
@@ -206,15 +214,6 @@
                 </div>
                 <div class="input">
                     <strong>{{ rowCount|number }}</strong>
-                </div>
-            </div>
-
-            <div class="field">
-                <div class="heading">
-                    <label>{{ 'Send Invitations'|t('formie-campaigns') }}</label>
-                </div>
-                <div class="input">
-                    {{ queueSending ? 'Yes'|t('formie-campaigns') : 'No'|t('formie-campaigns') }}
                 </div>
             </div>
         </div>
@@ -276,4 +275,13 @@
             mappingErrorDiv.style.display = 'none';
         });
     });
+
+    // Sync sidebar toggle with hidden form input
+    const queueSendingToggle = document.getElementById('queueSendingToggle');
+    const queueSendingInput = document.querySelector('input[name="queueSending"]');
+    if (queueSendingToggle && queueSendingInput) {
+        queueSendingToggle.addEventListener('change', function() {
+            queueSendingInput.value = this.classList.contains('on') ? '1' : '0';
+        });
+    }
 {% endjs %}

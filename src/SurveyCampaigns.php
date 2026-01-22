@@ -153,7 +153,7 @@ class SurveyCampaigns extends Plugin
         }
 
         if ($item) {
-            $item['label'] = $this->getSettings()->getDisplayName();
+            $item['label'] = $this->getSettings()->getFullName();
             $item['icon'] = '@appicons/share.svg';
 
             $item['subnav'] = [];

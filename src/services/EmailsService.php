@@ -79,10 +79,15 @@ class EmailsService extends Component
         $surveyLink = SurveyCampaigns::$plugin->customers->getBitlyUrl(
             $campaignElement->getUrl() . '?invitationCode=' . $customer->emailInvitationCode
         );
+
+        // Get language from customer's site
+        $site = Craft::$app->getSites()->getSiteById($customer->siteId);
+        $language = $site ? strtolower(substr($site->language, 0, 2)) : 'en';
+
         $variables = [
             'customer_name' => $customer->name,
             'survey_link' => $surveyLink,
-            'defaultLanguage' => $customer->siteId == 1 ? 'en' : 'ar',
+            'defaultLanguage' => $language,
         ];
 
         $email = $customer->email;

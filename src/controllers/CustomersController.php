@@ -13,6 +13,8 @@ use craft\db\ActiveQuery;
 use craft\web\Controller;
 use craft\web\UploadedFile;
 use lindemannrock\surveycampaigns\helpers\PhoneHelper;
+use lindemannrock\surveycampaigns\jobs\SendBatchJob;
+use lindemannrock\surveycampaigns\records\CampaignRecord;
 use lindemannrock\surveycampaigns\records\CustomerRecord;
 use lindemannrock\surveycampaigns\SurveyCampaigns;
 use verbb\formie\Formie;
@@ -36,34 +38,75 @@ class CustomersController extends Controller
         $this->requirePostRequest();
 
         $sms = $this->request->getParam('sms');
+        $email = $this->request->getParam('email');
+
+        // Create customer record with submitted data first (for form re-population)
+        $customer = new CustomerRecord([
+            'campaignId' => $this->request->getRequiredParam('campaignId'),
+            'siteId' => $this->request->getRequiredParam('siteId'),
+            'name' => $this->request->getParam('name'),
+            'email' => $email,
+            'sms' => $sms,
+        ]);
+
+        $hasErrors = false;
+
+        // Validate name is provided
+        if (empty($customer->name)) {
+            $customer->addError('name', Craft::t('formie-campaigns', 'Name is required.'));
+            $hasErrors = true;
+        }
+
+        // Validate email format
+        if ($email !== null && $email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $customer->addError('email', Craft::t('formie-campaigns', 'Invalid email address.'));
+            $hasErrors = true;
+        }
 
         // Validate and sanitize phone number
         if ($sms !== null && $sms !== '') {
             $phoneValidation = PhoneHelper::validate($sms);
             if (!$phoneValidation['valid']) {
-                return $this->returnErrorResponse(
-                    $phoneValidation['error'] ?? 'Invalid phone number',
-                    ['field' => 'sms']
-                );
+                $customer->addError('sms', $phoneValidation['error'] ?? Craft::t('formie-campaigns', 'Invalid phone number.'));
+                $hasErrors = true;
+            } else {
+                $customer->sms = $phoneValidation['sanitized'];
             }
-            $sms = $phoneValidation['sanitized'];
         }
 
-        $customer = new CustomerRecord([
-            'campaignId' => $this->request->getRequiredParam('campaignId'),
-            'siteId' => $this->request->getRequiredParam('siteId'),
-            'name' => $this->request->getRequiredParam('name'),
-            'email' => $this->request->getParam('email'),
-            'sms' => $sms,
-        ]);
+        // Must have at least email or SMS
+        if (empty($email) && empty($sms)) {
+            $customer->addError('email', Craft::t('formie-campaigns', 'Email or phone number is required.'));
+            $hasErrors = true;
+        }
+
+        if ($hasErrors) {
+            return $this->returnErrorResponse(
+                Craft::t('formie-campaigns', 'Please fix the errors below.'),
+                ['customer' => $customer]
+            );
+        }
 
         if (!$customer->save()) {
             return $this->returnErrorResponse(
-                'Could not save Customer.',
-                [
-                    'customer' => $customer,
-                ]
+                Craft::t('formie-campaigns', 'Could not save customer.'),
+                ['customer' => $customer]
             );
+        }
+
+        // Queue invitation if requested
+        $sendInvitation = $this->request->getBodyParam('sendInvitation');
+        if ($sendInvitation) {
+            $campaign = CampaignRecord::findOneForSite($customer->campaignId, $customer->siteId);
+            if ($campaign) {
+                Craft::$app->getQueue()->push(new SendBatchJob([
+                    'campaignId' => $customer->campaignId,
+                    'siteId' => $customer->siteId,
+                    'customerIds' => [$customer->id],
+                    'sendSms' => !empty($customer->sms),
+                    'sendEmail' => !empty($customer->email),
+                ]));
+            }
         }
 
         return $this->returnSuccessResponse($customer);

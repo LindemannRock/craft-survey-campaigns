@@ -57,7 +57,10 @@ class TriggerCampaignJob extends BaseJob implements RetryableJobInterface
      */
     protected function defaultDescription(): ?string
     {
-        return Craft::t('formie-campaigns', 'Triggering campaign invitation(s)');
+        $settings = SurveyCampaigns::$plugin->getSettings();
+        return Craft::t('formie-campaigns', '{pluginName}: Triggering campaign invitation(s)', [
+            'pluginName' => $settings->getDisplayName(),
+        ]);
     }
 
     /**

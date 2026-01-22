@@ -69,8 +69,12 @@ class SendBatchJob extends BaseJob implements RetryableJobInterface
      */
     protected function defaultDescription(): ?string
     {
+        $settings = SurveyCampaigns::$plugin->getSettings();
         $count = count($this->customerIds);
-        return Craft::t('formie-campaigns', 'Sending invitations to {count} customers', ['count' => $count]);
+        return Craft::t('formie-campaigns', '{pluginName}: Sending invitations to {count} customers', [
+            'pluginName' => $settings->getDisplayName(),
+            'count' => $count,
+        ]);
     }
 
     /**
