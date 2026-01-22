@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.0](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.1.0...v5.2.0) (2026-01-22)
+
+
+### Features
+
+* enhance customer management with new metrics and improved form handling ([36ec4bf](https://github.com/LindemannRock/craft-survey-campaigns/commit/36ec4bff5cc17f967ec687bcfdfe674710dd41c5))
+
 ## [5.1.0](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.0.3...v5.1.0) (2026-01-21)
 
 
