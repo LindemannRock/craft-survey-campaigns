@@ -10,6 +10,7 @@ namespace lindemannrock\surveycampaigns\services;
 
 use Craft;
 use craft\base\Component;
+use lindemannrock\base\helpers\PluginHelper;
 use lindemannrock\logginglibrary\traits\LoggingTrait;
 use lindemannrock\smsmanager\SmsManager;
 use lindemannrock\surveycampaigns\SurveyCampaigns;
@@ -73,8 +74,7 @@ class SmsService extends Component
      */
     public function isSmsManagerAvailable(): bool
     {
-        return Craft::$app->getPlugins()->isPluginInstalled('sms-manager') &&
-               Craft::$app->getPlugins()->isPluginEnabled('sms-manager');
+        return PluginHelper::isPluginEnabled('sms-manager');
     }
 
     /**

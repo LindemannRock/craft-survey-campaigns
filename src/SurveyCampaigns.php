@@ -102,8 +102,8 @@ class SurveyCampaigns extends Plugin
         PluginHelper::bootstrap(
             $this,
             'surveyCampaignsHelper',
-            ['surveyCampaigns:viewLogs'],
-            ['surveyCampaigns:downloadLogs']
+            ['surveyCampaigns:viewSystemLogs'],
+            ['surveyCampaigns:downloadSystemLogs']
         );
         PluginHelper::applyPluginNameFromConfig($this);
 
@@ -167,10 +167,9 @@ class SurveyCampaigns extends Plugin
             }
 
             // System Logs (using logging library)
-            if (Craft::$app->getPlugins()->isPluginInstalled('logging-library') &&
-                Craft::$app->getPlugins()->isPluginEnabled('logging-library')) {
+            if (PluginHelper::isPluginEnabled('logging-library')) {
                 $item = LoggingLibrary::addLogsNav($item, $this->handle, [
-                    'surveyCampaigns:viewLogs',
+                    'surveyCampaigns:viewSystemLogs',
                 ]);
             }
 
@@ -402,8 +401,13 @@ class SurveyCampaigns extends Plugin
             'surveyCampaigns:viewLogs' => [
                 'label' => Craft::t('formie-campaigns', 'View logs'),
                 'nested' => [
-                    'surveyCampaigns:downloadLogs' => [
-                        'label' => Craft::t('formie-campaigns', 'Download logs'),
+                    'surveyCampaigns:viewSystemLogs' => [
+                        'label' => Craft::t('formie-campaigns', 'View system logs'),
+                        'nested' => [
+                            'surveyCampaigns:downloadSystemLogs' => [
+                                'label' => Craft::t('formie-campaigns', 'Download system logs'),
+                            ],
+                        ],
                     ],
                 ],
             ],
