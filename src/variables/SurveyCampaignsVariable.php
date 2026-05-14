@@ -10,7 +10,6 @@ namespace lindemannrock\surveycampaigns\variables;
 
 use Craft;
 use craft\base\ElementInterface;
-use craft\ckeditor\CkeConfig;
 use craft\ckeditor\web\assets\ckeditor\CkeditorAsset;
 use craft\helpers\Html;
 use craft\helpers\Json;
@@ -64,8 +63,6 @@ class SurveyCampaignsVariable extends Behavior
         $view = Craft::$app->getView();
         $view->registerAssetBundle(CkeditorAsset::class);
 
-        $ckeConfig = new CkeConfig();
-
         // Toolbar cleanup
         $toolbar = ['bold'];
         $toolbar = array_values($toolbar);
@@ -89,7 +86,7 @@ class SurveyCampaignsVariable extends Behavior
                         'view' => "h$level",
                         'title' => "Heading $level",
                         'class' => "ck-heading_heading$level",
-                    ], $ckeConfig->headingLevels ?: []),
+                    ], [1, 2, 3, 4, 5, 6]),
                 ],
             ],
             'image' => [
@@ -118,22 +115,7 @@ class SurveyCampaignsVariable extends Behavior
             ],
         ];
 
-        if (isset($ckeConfig->options)) {
-            // translate the placeholder text
-            if (isset($ckeConfig->options['placeholder']) && is_string($ckeConfig->options['placeholder'])) {
-                $ckeConfig->options['placeholder'] = Craft::t('site', $ckeConfig->options['placeholder']);
-            }
-
-            $configOptionsJs = Json::encode($ckeConfig->options);
-        } elseif (isset($ckeConfig->js)) {
-            $configOptionsJs = <<<JS
-(() => {
-  $ckeConfig->js
-})()
-JS;
-        } else {
-            $configOptionsJs = '{}';
-        }
+        $configOptionsJs = '{}';
 
         $baseConfigJs = Json::encode($baseConfig);
         $toolbarJs = Json::encode($toolbar);
@@ -201,10 +183,6 @@ JS;
 JS,
             View::POS_END,
         );
-
-        if ($ckeConfig->css) {
-            $view->registerCss($ckeConfig->css);
-        }
 
         $html = Html::textarea($handle, $value, [
             'id' => $id,
