@@ -8,15 +8,27 @@
 
 namespace lindemannrock\surveycampaigns\integrations;
 
+use Craft;
 use craft\helpers\UrlHelper;
 use lindemannrock\smsmanager\integrations\IntegrationInterface;
 use lindemannrock\surveycampaigns\records\CampaignRecord;
+use lindemannrock\surveycampaigns\SurveyCampaigns;
 use verbb\formie\elements\Form;
 
 /**
  * SMS Manager Integration
  *
- * Reports Survey Campaigns usage to SMS Manager.
+ * Reports Survey Campaigns usage to SMS Manager so the delete guard in
+ * `SenderIdsService::deleteSenderId()` blocks deletion of any sender this
+ * plugin is using.
+ *
+ * Usage sources covered:
+ *  - Per-campaign assignment (`CampaignRecord.senderId`)
+ *  - Plugin-default sender (`defaultSenderIdId`)
+ *
+ * Survey Campaigns doesn't store a provider directly — providers are
+ * implied by whichever sender is selected — so `getProviderUsages()`
+ * returns an empty array.
  *
  * @author    LindemannRock
  * @package   SurveyCampaigns
@@ -29,8 +41,6 @@ class SmsManagerIntegration implements IntegrationInterface
      */
     public function getProviderUsages(int $providerId): array
     {
-        // Survey Campaigns doesn't store provider ID directly,
-        // it uses sender ID which is linked to a provider
         return [];
     }
 
@@ -41,14 +51,12 @@ class SmsManagerIntegration implements IntegrationInterface
     {
         $usages = [];
 
-        // Find all campaigns that use this sender ID
         /** @var CampaignRecord[] $campaigns */
         $campaigns = CampaignRecord::find()
             ->where(['senderId' => $senderIdId])
             ->all();
 
         foreach ($campaigns as $campaign) {
-            // Get the form name for a better label
             $label = 'Campaign #' . $campaign->id;
             if ($campaign->formId) {
                 $form = Form::find()->id($campaign->formId)->one();
@@ -60,6 +68,15 @@ class SmsManagerIntegration implements IntegrationInterface
             $usages[] = [
                 'label' => $label,
                 'editUrl' => UrlHelper::cpUrl('survey-campaigns/campaigns/' . $campaign->id),
+            ];
+        }
+
+        // Plugin-default sender — compare directly against the stored int id.
+        $settings = SurveyCampaigns::$plugin->getSettings();
+        if ($settings->defaultSenderIdId !== null && (int) $settings->defaultSenderIdId === $senderIdId) {
+            $usages[] = [
+                'label' => Craft::t('survey-campaigns', 'Plugin Default Sender ID'),
+                'editUrl' => UrlHelper::cpUrl('survey-campaigns/settings'),
             ];
         }
 
