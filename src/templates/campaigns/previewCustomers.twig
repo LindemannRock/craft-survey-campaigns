@@ -47,7 +47,7 @@
 ]) %}
 
 {% block content %}
-    <h2 style="margin-top: 0;">{{ 'Import Preview'|t('formie-campaigns') }}</h2>
+    <h2 class="first">{{ 'Import Preview'|t('formie-campaigns') }}</h2>
 
     {# Summary Cards #}
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 30px 0;">
@@ -181,7 +181,7 @@
         {{ hiddenInput('campaignId', campaignId) }}
 
         <div style="background: #f7f7f7; padding: 20px; border-radius: 4px; margin: 20px 0;">
-            <h3 style="margin-top: 0;">{{ 'Ready to Import'|t('formie-campaigns') }}</h3>
+            <h3 class="first">{{ 'Ready to Import'|t('formie-campaigns') }}</h3>
             <p>
                 {% if summary.validRows > 0 %}
                     {{ 'Click the button below to import {count} valid customer(s).'|t('formie-campaigns', {count: summary.validRows}) }}
