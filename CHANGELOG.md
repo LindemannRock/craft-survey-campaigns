@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.1](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.2.0...v5.2.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* drop PAT requirement for release-please — use built-in GITHUB_TOKEN ([1ecde47](https://github.com/LindemannRock/craft-survey-campaigns/commit/1ecde472ae47461f9da886fe95556e0fcaffc262))
+
 ## [5.2.0](https://github.com/LindemannRock/craft-survey-campaigns/compare/v5.1.0...v5.2.0) (2026-01-22)
 
 
